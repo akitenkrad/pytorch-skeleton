@@ -26,7 +26,7 @@ def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer
 
             # get output
             out = model(x)
-            loss = loss_func(out, y)
+            loss = loss_func(out, y.type(torch.long))
 
             # compute the smoothed loss
             avg_loss = beta * avg_loss + (1-beta) * loss.item()
