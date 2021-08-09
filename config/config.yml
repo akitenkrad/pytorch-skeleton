@@ -1,0 +1,17 @@
+model: dla34
+epochs: 200
+batch_size: 4
+test_size: 0.2
+lr: 0.0001
+lr_decay: 0.99
+early_stop_patience: 15
+threshold: 0.5
+k_folds: 4
+lr_finder:
+    initial_value: 0.000000001
+    final_value: 10.0
+    beta: 0.98
+dataset_path: /workplace/pytorch_skeleton/data
+weights_dir: /workplace/pytorch_skeleton/weights
+log_dir: /workplace/pytorch_skeleton/logs
+out_dir: /workplace/pytorch_skeleton/outputs
