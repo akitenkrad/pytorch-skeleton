@@ -1,3 +1,4 @@
+from os import sched_getscheduler
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -6,9 +7,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 import torch
-import torch.optim as optim
 import torch.nn as nn
-from torch.utils.data import Dataset
+import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from utils.logger import get_logger, Logger
@@ -16,14 +16,13 @@ from utils.watchers import SimpleWatcher, AucWatcher
 from utils.utils import tqdm, load_config, describe_model, now 
 from datasets import BaseDataset
 
-def validate(batch_size, epoch, ds:BaseDataset, model, loss_func, threshold):
+def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dl = DataLoader(ds, batch_size=batch_size)
 
     loss_watcher = SimpleWatcher('loss', default_value=sys.maxsize)
     auc_watcher = AucWatcher('auc', threshold=threshold)
 
-    with tqdm(dl, total=len(dl), desc=f'[Epoch {epoch:4d} - Validate:{ds.phase}]', leave=False) as valid_it:
+    with tqdm(valid_dl, total=len(valid_dl), desc=f'[Epoch {epoch:4d} - Validate]', leave=False) as valid_it:
         for x, y in valid_it:
             x, y = x.type(torch.float32).to(device), y.type(torch.float32).to(device)
             with torch.no_grad():
@@ -33,7 +32,6 @@ def validate(batch_size, epoch, ds:BaseDataset, model, loss_func, threshold):
 
                 loss_watcher.put(loss.item())
                 auc_watcher.put(out.cpu().numpy(), y.cpu().numpy())
-    ds.train()
     return auc_watcher.auc, loss_watcher.mean()
 
 def save_model(config, model, name):
@@ -41,15 +39,10 @@ def save_model(config, model, name):
     save_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), str(save_dir / name))
 
-def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
+def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim.Optimizer, lr_scheduler, loss_func, logger:Logger):
 
     # load model
     model = model.train().to(config.device)
-
-    # optimizer, loss
-    optimizer = optim.Adam(model.parameters(), lr=config.lr)
-    optim_scheduler = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=config.lr_decay)
-    loss_func = torch.nn.BCELoss()
 
     log_dir = Path(config.log_dir) / 'exp_{}'.format(datetime.now(timezone(timedelta(hours=9), 'JST')).strftime('%Y%m%d-%H%M%S'))
     with SummaryWriter(str(log_dir)) as writer:
@@ -61,10 +54,10 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
                 fold_it.set_description(f'[Fold {fold:2d}]')
 
                 # prepare dataloader
-                dataset.train_indices = train_indices
-                dataset.valid_indices = valid_indices
-                dataset.train()
-                dl = DataLoader(dataset, batch_size=config.batch_size)
+                train_subsampler = torch.utils.data.SubsetRandomSampler(train_indices)
+                valid_subsampler = torch.utils.data.SubsetRandomSampler(valid_indices)
+                train_dl = DataLoader(dataset, batch_size=config.batch_size, sampler=train_subsampler)
+                valid_dl = DataLoader(dataset, batch_size=config.batch_size, sampler=valid_subsampler)
 
                 # Epoch roop
                 with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} / Epoch   0]', leave=False) as epoch_it:
@@ -74,17 +67,17 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
                         loss_watcher = SimpleWatcher('loss', default_value=sys.maxsize)
 
                         # Batch roop
-                        with tqdm(enumerate(dl), total=len(dl), desc=f'[Epoch {epoch:3d} / Batch {0:3d}]', leave=False) as batch_it:
+                        with tqdm(enumerate(train_dl), total=len(train_dl), desc=f'[Epoch {epoch:3d} / Batch {0:3d}]', leave=False) as batch_it:
                             for batch, (x, y) in batch_it:
 
                                 x = x.type(torch.float32).to(config.device)
-                                y = y.type(torch.float32).to(config.device)
+                                y = y.type(torch.long).to(config.device)
 
                                 # model output
                                 out = model(x)
 
                                 # calculate loss
-                                loss = loss_func(out.squeeze(), y)
+                                loss = loss_func(out, y)
 
                                 # update parameters
                                 optimizer.zero_grad()
@@ -96,18 +89,17 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
                                 batch_it.set_description(f'[Epoch {epoch:3d} / Batch {batch:3d}] Loss: {loss.item():.5f}')
 
                         # evaluation
-                        dataset.valid()
-                        val_auc, val_loss = validate(config.batch_size, epoch, dataset, model, loss_func, config.threshold)
+                        val_auc, val_loss = validate(epoch, valid_dl, model, loss_func, config.threshold)
 
-                        # step learning rate
-                        optim_scheduler.step()
+                        # step scheduler
+                        lr_scheduler.step()
 
                         # update iteration description
                         desc = f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean():.5f} | Valid Loss:{val_loss:.5f} | Valid AUC: {val_auc:.5f}'
                         epoch_it.set_description(desc)
 
                         # logging
-                        last_lr = optim_scheduler.get_last_lr()[0]
+                        last_lr = lr_scheduler.get_last_lr()[0]
                         logger.info(f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean():.5f} | Valid Loss:{val_loss:.5f} | Valid AUC: {val_auc:.5f} | LR: {last_lr:.7f}')
                         writer.add_text('train_log', desc, epoch)
                         writer.add_scalar('train loss', loss_watcher.mean(), epoch)
@@ -131,39 +123,31 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
 
                     save_model(config, model, f'{config.model}_last.pt')
 
-def predict(config):
-    logger = get_logger('predict.log')
-    config = load_config(config, logger)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def predict(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
 
     # load dataset
-    image_size = (config.image_size.height, config.image_size.width, config.image_size.length)
-    dataset = BaseDataset(config.dataset_path, image_size=image_size, test_size=config.test_size, phase='test', logger=logger)
     dl = DataLoader(dataset, batch_size=config.batch_size)
 
     # load model
-    blocks_args, global_params = get_model_params('efficientnet-b0', {'num_classes': 1, 'image_size': image_size})
-    model = EfficientNet(blocks_args, global_params)
-    model = model.train().to(device)
-    describe_model(model, logger)
+    model = model.eval().to(config.device)
 
     # load weights
     weights_path = Path(config.weights_dir) / f'{config.model}_best.pt'
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(str(weights_path)))
     else:
-        model.load_state_dict(torch.load(str(weights_path), map_location=device))
+        model.load_state_dict(torch.load(str(weights_path), map_location=config.device))
 
     with tqdm(dl, total=len(dl), desc=f'predicting...', leave=False) as batch_it:
         outputs = []
-        for x, case in batch_it:
+        for x in batch_it:
             
-            x = x.type(torch.float32).to(device)
+            x = x.type(torch.float32).to(config.device)
             with torch.no_grad():
                 out = model(x)
                 out = out.squeeze().numpy()
-                for o, c in zip(out, case):
-                    outputs.append({'BraTS21ID': case, 'MGMT_value': o})
+                for label in out:
+                    outputs.append({'label': label.argmax()})
         
         out_path = Path(config.out_dir) / f'{config.model}_{now().strftime("%Y%m%d%H%M%S")}' / 'submission.csv'
         out_path.parent.mkdir(parents=True, exist_ok=True)
