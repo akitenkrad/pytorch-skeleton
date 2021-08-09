@@ -24,7 +24,7 @@ def train(config):
     dataset = MnistDataset(config.dataset_path, config.test_size, 'train', logger)
 
     # prepare model
-    model = dla34()
+    model = dla34(num_classes=10, pool_size=1)
     describe_model(model, logger)
 
     # run train
@@ -42,7 +42,7 @@ def find_lr(config):
     dl = DataLoader(dataset, batch_size=config.batch_size)
 
     # load model
-    model = dla34(pool_size=1)
+    model = dla34(num_classes=10 ,pool_size=1)
     model = model.train().to(config.device)
     describe_model(model, logger)
 
