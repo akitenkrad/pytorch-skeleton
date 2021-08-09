@@ -65,7 +65,7 @@ class MnistDataset(BaseDataset):
         
         # list -> dict
         train_images = {idx:data.reshape(28, 28) for idx, data in enumerate(train_images)}
-        train_labels = {idx:data for idx, data in enumerate(train_images)}
+        train_labels = {idx:data for idx, data in enumerate(train_labels)}
         test_images = {idx:data.reshape(28, 28) for idx, data in enumerate(test_images)}
         test_labels = {idx:data for idx, data in enumerate(test_labels)}
 
