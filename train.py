@@ -58,7 +58,7 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
 
                 # Epoch roop
                 with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} / Epoch   0]', leave=False) as epoch_it:
-                    valid_loss_watcher = SimpleWatcher('valid_loss', default_value=-1, patience=config.early_stop_patience)
+                    valid_loss_watcher = SimpleWatcher('valid_loss', default_value=-1, order='descending', patience=config.early_stop_patience)
 
                     for epoch in epoch_it:
                         loss_watcher = SimpleWatcher('loss', default_value=sys.maxsize)
@@ -113,7 +113,7 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
 
                         # early stopping
                         if valid_loss_watcher.early_stop:
-                            logger.info(f'====== Early Stopping @epoch: {epoch} @AUC: {valid_loss_watcher.best_score:5.10f} ======')
+                            logger.info(f'====== Early Stopping @epoch: {epoch} @Loss: {valid_loss_watcher.best_score:5.10f} ======')
                             save_model(config, model, f'{config.model}_last.pt')
                             break
 
