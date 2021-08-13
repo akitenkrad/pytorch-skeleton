@@ -6,14 +6,17 @@ from attrdict import AttrDict
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+
 from utils.logger import get_logger, Logger
 from utils.watchers import SimpleWatcher, AucWatcher
-from utils.utils import tqdm, load_config, describe_model, now 
+from utils.utils import tqdm, load_config, describe_model, now
+from utils.step import step, step_without_loss
 from datasets import BaseDataset
 
 def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
@@ -23,12 +26,10 @@ def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
 
     with tqdm(valid_dl, total=len(valid_dl), desc=f'[Epoch {epoch:4d} - Validate]', leave=False) as valid_it:
         for x, y in valid_it:
-            x, y = x.type(torch.float32).to(device), y.type(torch.long).to(device)
             with torch.no_grad():
-                out = model(x)
-                loss = loss_func(out, y)
-
+                loss = step(model, device, x, y, loss_func)
                 loss_watcher.put(loss.item())
+
     return loss_watcher.mean()
 
 def save_model(config, model, name):
@@ -42,6 +43,7 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
     model = model.train().to(config.device)
 
     log_dir = Path(config.log_dir) / 'exp_{}'.format(datetime.now(timezone(timedelta(hours=9), 'JST')).strftime('%Y%m%d-%H%M%S'))
+    global_step = 0
     with SummaryWriter(str(log_dir)) as writer:
 
         # k-fold cross validation
@@ -67,14 +69,8 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                         with tqdm(enumerate(train_dl), total=len(train_dl), desc=f'[Epoch {epoch:3d} / Batch {0:3d}]', leave=False) as batch_it:
                             for batch, (x, y) in batch_it:
 
-                                x = x.type(torch.float32).to(config.device)
-                                y = y.type(torch.long).to(config.device)
-
-                                # model output
-                                out = model(x)
-
-                                # calculate loss
-                                loss = loss_func(out, y)
+                                # process model and calculate loss
+                                loss = step(model, config.device, x, y, loss_func)
 
                                 # update parameters
                                 optimizer.zero_grad()
@@ -82,8 +78,12 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                                 optimizer.step()
 
                                 # put logs
+                                writer.add_scalar('train loss', loss.item(), global_step)
                                 loss_watcher.put(loss.item())
                                 batch_it.set_description(f'[Epoch {epoch:3d} / Batch {batch:3d}] Loss: {loss.item():.5f}')
+
+                                # global step for summary writer
+                                global_step += 1
 
                         # evaluation
                         val_loss = validate(epoch, valid_dl, model, loss_func, config.threshold)
@@ -98,9 +98,8 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                         # logging
                         last_lr = lr_scheduler.get_last_lr()[0]
                         logger.info(f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean():.5f} | Valid Loss:{val_loss:.5f} | LR: {last_lr:.7f}')
-                        writer.add_text('train_log', desc, epoch)
-                        writer.add_scalar('train loss', loss_watcher.mean(), epoch)
-                        writer.add_scalar('valid loss', val_loss, epoch)
+                        writer.add_text('train_log', desc, global_step)
+                        writer.add_scalar('valid loss', val_loss, global_step)
 
                         # save best model
                         if valid_loss_watcher.is_best:
@@ -137,10 +136,8 @@ def predict(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger
     with tqdm(dl, total=len(dl), desc=f'predicting...', leave=False) as batch_it:
         outputs = []
         for x in batch_it:
-            
-            x = x.type(torch.float32).to(config.device)
             with torch.no_grad():
-                out = model(x)
+                out = step_without_loss(model, config.device, x)
                 out = out.squeeze().numpy()
                 for label in out:
                     outputs.append({'label': label.argmax()})

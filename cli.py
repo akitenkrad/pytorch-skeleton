@@ -7,7 +7,7 @@ from utils.utils import load_config, describe_model
 from utils.lr_finder import lr_finder, save_figure
 from train import train as train_func, predict as pred_func
 from datasets import MnistDataset
-from models import dla34
+from models.dla import dla34
 
 @click.group()
 def cli():

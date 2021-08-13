@@ -1,12 +1,15 @@
 from attrdict import AttrDict
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
+
+from .step import step
 
 def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer:optim.Optimizer, loss_func, init_value=1e-8, final_value=10.0, beta=0.98):
     num = len(dataloader) - 1
@@ -21,12 +24,8 @@ def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer
     with tqdm(enumerate(dataloader), total=len(dataloader), desc='[B:{:05d}] lr:{:.8f} best_loss:{:.3f}'.format(0, lr, -1)) as it:
         for idx, (x, y) in it:
 
-            x = x.to(config.device)
-            y = y.to(config.device)
-
-            # get output
-            out = model(x)
-            loss = loss_func(out, y.type(torch.long))
+            # process model and calculate loss
+            loss = step(model, config.device, x, y, loss_func)
 
             # compute the smoothed loss
             avg_loss = beta * avg_loss + (1-beta) * loss.item()
