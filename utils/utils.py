@@ -7,44 +7,23 @@ from logging import Logger
 import yaml
 import numpy as np
 from attrdict import AttrDict
+from collections import namedtuple
 from glob import glob
 from tqdm import tqdm
+from enum import Enum
+
 import torch
 from .logger import get_logger
+
+class Phase(Enum):
+    DEV = 1
+    TRAIN = 2
+    VALID = 3
+    TEST = 4
 
 def now():
     JST = timezone(timedelta(hours=9))
     return datetime.now(JST)
-
-def load_mnist(path, kind='train'):
-    '''Load MNIST data from `path`'''
-
-    assert kind in ['train', 'test']
-    if kind == 'test':
-        kind = 't10k'
-
-    path = Path(path)
-    path.mkdir(parents=True, exist_ok=True)
-    labels_path = path / f'{kind}-labels-idx1-ubyte.gz'
-    images_path = path / f'{kind}-images-idx3-ubyte.gz'
-
-    if not labels_path.exists() or not images_path.exists():
-        urls = [
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz',
-        ]
-        for url in tqdm(urls, desc='loading mnist data...'):
-            urlData = requests.get(url).content
-            with open(path / url.split('/')[-1], 'wb') as f:
-                f.write(urlData)
-
-    with gzip.open(str(labels_path), 'rb') as lbpath:
-        labels = np.frombuffer(lbpath.read(), dtype=np.uint8, offset=8)
-    with gzip.open(str(images_path), 'rb') as imgpath:
-        images = np.frombuffer(imgpath.read(), dtype=np.uint8, offset=16).reshape(len(labels), 784)
-    return images, labels
 
 def load_config(config_path:str, logger:Logger=None):
     if logger is None:
@@ -70,3 +49,32 @@ def describe_model(model:torch.nn.Module, logger:Logger):
     logger.info('----------------------------')
     logger.info('{:20s}: {}'.format('total_params', total_params))
     logger.info('============================')
+
+def load_mnist(path, kind:Phase=Phase.TRAIN):
+    '''Load MNIST data from `path`'''
+
+    kind_name_map = {Phase.TRAIN: 'train', Phase.TEST: 't10k'}
+    kind_name = kind_name_map[kind]
+
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    labels_path = path / f'{kind_name}-labels-idx1-ubyte.gz'
+    images_path = path / f'{kind_name}-images-idx3-ubyte.gz'
+
+    if not labels_path.exists() or not images_path.exists():
+        urls = [
+            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz',
+            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz',
+            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz',
+            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz',
+        ]
+        for url in tqdm(urls, desc='loading mnist data...'):
+            urlData = requests.get(url).content
+            with open(path / url.split('/')[-1], 'wb') as f:
+                f.write(urlData)
+
+    with gzip.open(str(labels_path), 'rb') as lbpath:
+        labels = np.frombuffer(lbpath.read(), dtype=np.uint8, offset=8)
+    with gzip.open(str(images_path), 'rb') as imgpath:
+        images = np.frombuffer(imgpath.read(), dtype=np.uint8, offset=16).reshape(len(labels), 784)
+    return images, labels

@@ -1,9 +1,11 @@
 import click
+
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
+
 from utils.logger import get_logger
-from utils.utils import load_config, describe_model
+from utils.utils import load_config, describe_model, Phase
 from utils.lr_finder import lr_finder, save_figure
 from train import train as train_func, predict as pred_func
 from datasets import MnistDataset
@@ -21,7 +23,7 @@ def train(config):
     config = load_config(config, logger)
 
     # prepare dataset
-    dataset = MnistDataset(config.dataset_path, config.test_size, 'train', logger)
+    dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TRAIN, logger)
     dataset.train()
 
     # prepare model
@@ -40,11 +42,11 @@ def train(config):
 @click.option('--config', type=click.Path(exists=True), help='path to config.yml')
 def predict(config):
     # load config   
-    logger = get_logger('train.log', silent=True)
+    logger = get_logger('predict.log', silent=True)
     config = load_config(config, logger)
 
     # prepare dataset
-    dataset = MnistDataset(config.dataset_path, config.test_size, 'train', logger)
+    dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TEST, logger)
     dataset.test()
 
     # prepare model
@@ -62,7 +64,7 @@ def find_lr(config):
     config = load_config(config, logger)
 
     # prepare dataset
-    dataset = MnistDataset(config.dataset_path, config.test_size, 'train', logger)
+    dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TRAIN, logger)
     dl = DataLoader(dataset, batch_size=config.batch_size)
 
     # load model
