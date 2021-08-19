@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
 from utils.logger import get_logger, Logger
-from utils.watchers import SimpleWatcher, AucWatcher
+from utils.watchers import LossWatcher
 from utils.utils import tqdm, load_config, describe_model, now
 from utils.step import step, step_without_loss
 from datasets import BaseDataset
@@ -22,7 +22,7 @@ from datasets import BaseDataset
 def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    loss_watcher = SimpleWatcher('loss', default_value=sys.maxsize)
+    loss_watcher = LossWatcher('loss')
 
     with tqdm(valid_dl, total=len(valid_dl), desc=f'[Epoch {epoch:4d} - Validate]', leave=False) as valid_it:
         for x, y in valid_it:
@@ -60,10 +60,10 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
 
                 # Epoch roop
                 with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} / Epoch   0]', leave=False) as epoch_it:
-                    valid_loss_watcher = SimpleWatcher('valid_loss', default_value=-1, order='descending', patience=config.early_stop_patience)
+                    valid_loss_watcher = LossWatcher('valid_loss', patience=config.early_stop_patience)
 
                     for epoch in epoch_it:
-                        loss_watcher = SimpleWatcher('loss', default_value=sys.maxsize)
+                        loss_watcher = LossWatcher('loss')
 
                         # Batch roop
                         with tqdm(enumerate(train_dl), total=len(train_dl), desc=f'[Epoch {epoch:3d} / Batch {0:3d}]', leave=False) as batch_it:

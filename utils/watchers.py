@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timezone, timedelta
 import numpy as np
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
@@ -64,6 +65,10 @@ class SimpleWatcher(object):
             return self.default_value
         m = np.mean(np.diff([x[1] for x in self.data]))
         return 1.0 / m
+
+class LossWatcher(SimpleWatcher):
+    def __init__(self, name, patience=10):
+        super().__init__(name, default_value=sys.maxsize, order='descending', patience=patience)
 
 class AucWatcher(object):
     def __init__(self, name, threshold=0.5, patience=10):
