@@ -31,7 +31,7 @@ def train(config):
     describe_model(model, logger)
 
     # optimizer, loss
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=config.lr)
     lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=config.lr_decay)
     loss_func = torch.nn.CrossEntropyLoss()
 
@@ -77,7 +77,7 @@ def find_lr(config):
     loss_func = torch.nn.CrossEntropyLoss()
 
     # run lr_finder
-    log_lrs, losses = lr_finder(config, model, dl, optimizer, loss_func, config.lr_finder.initial_value, config.lr_finder.final_value, config.lr_finder.beta)
+    log_lrs, losses = lr_finder(config, model, dl, optimizer, loss_func, config.lr_finder.initial_value, config.lr_finder.final_value, config.lr_finder.beta, logger)
     save_figure(log_lrs, losses)
 
 if __name__ == '__main__':

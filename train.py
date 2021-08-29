@@ -58,6 +58,9 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                 train_dl = DataLoader(dataset, batch_size=config.batch_size, sampler=train_subsampler)
                 valid_dl = DataLoader(dataset, batch_size=config.batch_size, sampler=valid_subsampler)
 
+                # initialize learning rate
+                optimizer.param_groups[0]['lr'] = config.lr
+
                 # Epoch roop
                 with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} / Epoch   0]', leave=False) as epoch_it:
                     valid_loss_watcher = LossWatcher('valid_loss', patience=config.early_stop_patience)

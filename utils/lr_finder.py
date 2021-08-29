@@ -10,8 +10,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from .step import step
+from utils.logger import get_logger
 
-def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer:optim.Optimizer, loss_func, init_value=1e-8, final_value=10.0, beta=0.98):
+def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer:optim.Optimizer, loss_func, init_value=1e-8, final_value=10.0, beta=0.98, logger=None):
+    logger = logger if logger is not None else get_logger('lr_finder')
     num = len(dataloader) - 1
     mult = (final_value / init_value) ** (1 / num)
     lr = init_value
@@ -48,7 +50,9 @@ def lr_finder(config:AttrDict, model:nn.Module, dataloader:DataLoader, optimizer
             optimizer.step()
 
             # update progress bar
-            it.set_description('[B:{:05d}] lr:{:.8f} best_loss:{:.3f}'.format(idx+1, lr, best_loss))
+            desc = '[B:{:05d}] lr:{:.10f} best_loss:{:.6f} loss:{:.6f}'.format(idx+1, lr, best_loss, loss.item())
+            it.set_description(desc)
+            logger.info(desc)
             
             # update learning rate
             lr *= mult
