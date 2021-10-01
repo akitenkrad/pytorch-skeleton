@@ -7,13 +7,13 @@ def __out__(model, x):
 def __get_loss__(model, x, y, loss_func):
     out = __out__(model, x)
     loss = loss_func(out, y)
-    return loss
+    return loss, out
 
 def step(model, device, x, y, loss_func):
     x = x.type(torch.float32).to(device)
     y = y.type(torch.long).to(device)
-    loss = __get_loss__(model, x, y, loss_func)
-    return loss
+    loss, out = __get_loss__(model, x, y, loss_func)
+    return loss, out
 
 def step_without_loss(model, device, x):
     x = x.type(torch.float32).to(device)

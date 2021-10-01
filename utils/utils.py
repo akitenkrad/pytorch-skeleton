@@ -1,29 +1,64 @@
-import os
+from typing import Union, List, Dict
+import warnings
 import requests
 import gzip
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from logging import Logger
 import yaml
+import subprocess
 import numpy as np
+import pandas as pd
 from attrdict import AttrDict
 from collections import namedtuple
 from glob import glob
 from tqdm import tqdm
 from enum import Enum
-
 import torch
+
 from .logger import get_logger
+
+warnings.filterwarnings('ignore')
+
+NVIDIA_SMI_DEFAULT_ATTRIBUTES = (
+    'index',
+    'uuid',
+    'name',
+    'timestamp',
+    'memory.total',
+    'memory.free',
+    'memory.used',
+    'utilization.gpu',
+    'utilization.memory'
+)
 
 class Phase(Enum):
     DEV = 1
     TRAIN = 2
     VALID = 3
     TEST = 4
+    SUBMISSION = 5
 
 def now():
     JST = timezone(timedelta(hours=9))
     return datetime.now(JST)
+
+def describe_gpu(nvidia_smi_path='nvidia-smi', keys=NVIDIA_SMI_DEFAULT_ATTRIBUTES, no_units=True, logger:Logger=None):
+    if logger is None:
+        logger = get_logger('gpu_info.log')
+    nu_opt = '' if not no_units else ',nounits'
+    cmd = f'{nvidia_smi_path} --query-gpu={",".join(keys)} --format=csv,noheader{nu_opt}'
+    output = subprocess.check_output(cmd, shell=True)
+    lines = output.decode().split('\n')
+    lines = [line.strip() for line in lines if line.strip() != '']
+    lines = [{ k: v for k, v in zip(keys, line.split(', '))} for line in lines ]
+    
+    logger.info('====== show GPU information =========')
+    for line in lines:
+        for k, v in line.items():
+            logger.info(f'{k:25s}: {v}')
+    logger.info('=====================================')
+
 
 def load_config(config_path:str, logger:Logger=None):
     if logger is None:
@@ -35,6 +70,9 @@ def load_config(config_path:str, logger:Logger=None):
     for key, value in config.items():
         logger.info(f'config: {key:20s}: {value}')
     logger.info('============================')
+
+    if torch.cuda.is_available():
+        describe_gpu(logger=logger)
 
     return AttrDict(config)
 

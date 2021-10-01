@@ -1,10 +1,6 @@
-from os import sched_getscheduler
-import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from attrdict import AttrDict
-import numpy as np
-import pandas as pd
 from sklearn.model_selection import KFold
 
 import torch
@@ -13,10 +9,10 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
-from utils.logger import get_logger, Logger
+from utils.logger import Logger
 from utils.watchers import LossWatcher
-from utils.utils import tqdm, load_config, describe_model, now
-from utils.step import step, step_without_loss
+from utils.utils import tqdm
+from utils.step import step
 from datasets import BaseDataset
 
 def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
@@ -30,7 +26,7 @@ def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
                 loss = step(model, device, x, y, loss_func)
                 loss_watcher.put(loss.item())
 
-    return loss_watcher.mean()
+    return loss_watcher.mean
 
 def save_model(config, model, name):
     save_dir = Path(config.weights_dir)
@@ -62,18 +58,18 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                 optimizer.param_groups[0]['lr'] = config.lr
 
                 # Epoch roop
-                with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} / Epoch   0]', leave=False) as epoch_it:
+                with tqdm(range(config.epochs), total=config.epochs, desc=f'[Fold {fold:2d} | Epoch   0]', leave=False) as epoch_it:
                     valid_loss_watcher = LossWatcher('valid_loss', patience=config.early_stop_patience)
 
                     for epoch in epoch_it:
                         loss_watcher = LossWatcher('loss')
 
                         # Batch roop
-                        with tqdm(enumerate(train_dl), total=len(train_dl), desc=f'[Epoch {epoch:3d} / Batch {0:3d}]', leave=False) as batch_it:
+                        with tqdm(enumerate(train_dl), total=len(train_dl), desc=f'[Epoch {epoch:3d} | Batch {0:3d}]', leave=False) as batch_it:
                             for batch, (x, y) in batch_it:
 
                                 # process model and calculate loss
-                                loss = step(model, config.device, x, y, loss_func)
+                                loss, out = step(model, config.device, x, y, loss_func)
 
                                 # update parameters
                                 optimizer.zero_grad()
@@ -83,10 +79,13 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                                 # put logs
                                 writer.add_scalar('train loss', loss.item(), global_step)
                                 loss_watcher.put(loss.item())
-                                batch_it.set_description(f'[Epoch {epoch:3d} / Batch {batch:3d}] Loss: {loss.item():.5f}')
+                                batch_it.set_description(f'[Epoch {epoch:3d} | Batch {batch:3d}] Loss: {loss.item():.3f}')
 
                                 # global step for summary writer
                                 global_step += 1
+
+                                if batch > 0 and batch % config.logging_per_batch == 0:
+                                    logger.info(f'[Fold {fold:02d} | Epoch {epoch:03d} | Batch {batch:05d}/{len(train_dl):05d} ({(batch/len(train_dl)) * 100.0:.2f}%)] Loss:{loss.item():.3f}')
 
                         # evaluation
                         val_loss = validate(epoch, valid_dl, model, loss_func, config.threshold)
@@ -95,58 +94,28 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
                         lr_scheduler.step()
 
                         # update iteration description
-                        desc = f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean():.5f} | Valid Loss:{val_loss:.5f}'
+                        desc = f'[Fold {fold:2d} | Epoch {epoch:3d}] Train Loss: {loss_watcher.mean:.5f} | Valid Loss:{val_loss:.5f}'
                         epoch_it.set_description(desc)
 
                         # logging
                         last_lr = lr_scheduler.get_last_lr()[0]
-                        logger.info(f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean():.5f} | Valid Loss:{val_loss:.5f} | LR: {last_lr:.7f}')
+                        logger.info(f'[Fold {fold:2d} / Epoch {epoch:3d}] Train Loss: {loss_watcher.mean:.5f} | Valid Loss:{val_loss:.5f} | LR: {last_lr:.7f}')
                         writer.add_text('train_log', desc, global_step)
                         writer.add_scalar('valid loss', val_loss, global_step)
 
                         # save best model
                         if valid_loss_watcher.is_best:
-                            save_model(config, model, f'{config.model}_best.pt')
+                            save_model(config, model, f'{config.model.name}_best.pt')
                         valid_loss_watcher.put(val_loss)
 
                         # save model regularly
                         if epoch % 5 == 0:
-                            save_model(config, model, f'{config.model}_last.pt')
+                            save_model(config, model, f'{config.model.name}_last.pt')
 
                         # early stopping
                         if valid_loss_watcher.early_stop:
                             logger.info(f'====== Early Stopping @epoch: {epoch} @Loss: {valid_loss_watcher.best_score:5.10f} ======')
-                            save_model(config, model, f'{config.model}_last.pt')
+                            save_model(config, model, f'{config.model.name}_last.pt')
                             break
 
-                    save_model(config, model, f'{config.model}_last.pt')
-
-def predict(config:AttrDict, dataset:BaseDataset, model:nn.Module, logger:Logger):
-
-    # load dataset
-    dl = DataLoader(dataset, batch_size=config.batch_size)
-
-    # load model
-    model = model.eval().to(config.device)
-
-    # load weights
-    weights_path = Path(config.weights_dir) / f'{config.model}_best.pt'
-    if torch.cuda.is_available():
-        model.load_state_dict(torch.load(str(weights_path)))
-    else:
-        model.load_state_dict(torch.load(str(weights_path), map_location=config.device))
-
-    with tqdm(dl, total=len(dl), desc=f'predicting...', leave=False) as batch_it:
-        outputs = []
-        for x in batch_it:
-            with torch.no_grad():
-                out = step_without_loss(model, config.device, x)
-                out = out.squeeze().numpy()
-                for label in out:
-                    outputs.append({'label': label.argmax()})
-        
-        out_path = Path(config.out_dir) / f'{config.model}_{now().strftime("%Y%m%d%H%M%S")}' / 'submission.csv'
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        df = pd.DataFrame(outputs)
-        df.to_csv(str(out_path), index=False, header=True, float_format='%.15f')
-        logger.info(f'saved -> {str(out_path)}')
+                    save_model(config, model, f'{config.model.name}_last.pt')

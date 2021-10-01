@@ -9,9 +9,10 @@ def get_logger(name, silent=False) -> Logger:
     """Generate Logger instance
 
     Args:
-        classobject: class object
+        name: (str) name of the logger
+        silent: (bool) if True, don't write logs into stdout
     Returns:
-        [logger]: logger
+        Logger
     """
 
     # --------------------------------
@@ -29,7 +30,7 @@ def get_logger(name, silent=False) -> Logger:
     # --------------------------------
     logger = getLogger(name)
     logger.setLevel(logging.DEBUG)
-    handler_format = Formatter('%(asctime)s [%(levelname)8s] %(name)18s - %(message)s')
+    handler_format = Formatter('%(asctime)s [%(levelname)8s] %(name)15s - %(message)s')
 
     # --------------------------------
     # 2. handler configuration

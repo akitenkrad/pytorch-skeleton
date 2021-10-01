@@ -14,7 +14,11 @@ class SimpleWatcher(object):
         self.patience = patience
         self.counter = 0
         self.best_score = default_value
+        self.__count = 0
         self.__is_best = False
+        self.__min = sys.maxsize
+        self.__max = -1 * sys.maxsize
+        self.__mean = 0
 
     @property
     def early_stop(self):
@@ -27,6 +31,8 @@ class SimpleWatcher(object):
     def put(self, x):
         timestamp = datetime.now(self.jst)
         self.data.append((x, timestamp))
+        self.data = self.data[-1000:]
+        self.__count += 1
 
         if self.order == 'ascending':
             if self.best_score < x:
@@ -45,26 +51,27 @@ class SimpleWatcher(object):
                 self.counter += 1
                 self.__is_best = False
 
+        if x < self.__min:
+            self.__min = x
+        if self.__max < x:
+            self.__max = x
+        self.__mean = (self.__mean / ((self.__count - 1) / self.__count)) + (x / self.__count)
+
+    @property
     def mean(self):
-        if len(self.data) < 1:
-            return self.default_value
-        return np.mean([x[0] for x in self.data])
-
+        return self.__mean
+    @property
     def max(self):
-        if len(self.data) < 1:
-            return self.default_value
-        return np.max([x[0] for x in self.data])
-
+        return self.__max
+    @property
     def min(self):
-        if len(self.data) < 1:
-            return self.default_value
-        return np.min([x[0] for x in self.data])
+        return self.__min
 
     def fps(self):
         if len(self.data) < 1:
             return self.default_value
         m = np.mean(np.diff([x[1] for x in self.data]))
-        return 1.0 / m
+        return 1.0 / (m.seconds + 1e-10)
 
 class LossWatcher(SimpleWatcher):
     def __init__(self, name, patience=10):
