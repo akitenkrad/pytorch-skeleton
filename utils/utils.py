@@ -60,19 +60,20 @@ def describe_gpu(nvidia_smi_path='nvidia-smi', keys=NVIDIA_SMI_DEFAULT_ATTRIBUTE
     logger.info('=====================================')
 
 
-def load_config(config_path:str, logger:Logger=None):
-    if logger is None:
+def load_config(config_path:str, logger:Logger=None, no_log:bool=False):
+    if logger is None and no_log == False:
         logger = get_logger('load_config.log')
     config = yaml.safe_load(open(config_path))
     config['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    logger.info('====== show config =========')
-    for key, value in config.items():
-        logger.info(f'config: {key:20s}: {value}')
-    logger.info('============================')
+    if no_log == False:
+        logger.info('====== show config =========')
+        for key, value in config.items():
+            logger.info(f'config: {key:20s}: {value}')
+        logger.info('============================')
 
-    if torch.cuda.is_available():
-        describe_gpu(logger=logger)
+        if torch.cuda.is_available():
+            describe_gpu(logger=logger)
 
     return AttrDict(config)
 
