@@ -1,6 +1,7 @@
 from typing import Union, List, Dict
 import warnings
 import requests
+import cpuinfo
 import gzip
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -70,6 +71,12 @@ def load_config(config_path:str, logger:Logger=None, no_log:bool=False):
         logger.info('====== show config =========')
         for key, value in config.items():
             logger.info(f'config: {key:20s}: {value}')
+        logger.info('============================')
+
+        logger.info('====== cpu info ============')
+        for key, value in cpuinfo.get_cpu_info().items():
+            logger.info(f'CPU INFO: {key:20s}: {value}')
+        logger.info('CPU INFO: {:20s}: {}'.format('cpu_count', os.cpu_count()))
         logger.info('============================')
 
         if torch.cuda.is_available():

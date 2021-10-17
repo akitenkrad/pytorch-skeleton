@@ -38,7 +38,7 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
     # load model
     model = model.train().to(config.device)
 
-    log_dir = Path(config.log_dir) / 'exp_{}'.format(datetime.now(timezone(timedelta(hours=9), 'JST')).strftime('%Y%m%d-%H%M%S'))
+    log_dir = Path(config.log_dir) / 'tensorboard' / 'exp_{}'.format(datetime.now(timezone(timedelta(hours=9), 'JST')).strftime('%Y%m%d-%H%M%S'))
     global_step = 0
     with SummaryWriter(str(log_dir)) as writer:
 
