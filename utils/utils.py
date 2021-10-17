@@ -1,4 +1,5 @@
 from typing import Union, List, Dict
+import os
 import warnings
 import requests
 import cpuinfo
