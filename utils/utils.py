@@ -1,6 +1,7 @@
 from typing import Union, List, Dict
-import os
+import os, sys
 import warnings
+warnings.filterwarnings('ignore')
 import requests
 import cpuinfo
 import gzip
@@ -14,13 +15,21 @@ import pandas as pd
 from attrdict import AttrDict
 from collections import namedtuple
 from glob import glob
-from tqdm import tqdm
 from enum import Enum
 import torch
 
-from .logger import get_logger
+from utils.logger import get_logger
 
-warnings.filterwarnings('ignore')
+def is_colab():
+    return 'google.colab' in sys.modules
+
+if is_colab():
+    from tqdm.notebook import tqdm
+    print('running on google colab -> use tqdm.notebook')
+else:
+    from tqdm import tqdm
+
+StrOrPath = Union[str, Path]
 
 NVIDIA_SMI_DEFAULT_ATTRIBUTES = (
     'index',
@@ -62,12 +71,13 @@ def describe_gpu(nvidia_smi_path='nvidia-smi', keys=NVIDIA_SMI_DEFAULT_ATTRIBUTE
     logger.info('=====================================')
 
 
-def load_config(config_path:str, logger:Logger=None, no_log:bool=False):
-    if logger is None and no_log == False:
-        logger = get_logger('load_config.log')
+def load_config(config_path:str, no_log:bool=False):
     config = yaml.safe_load(open(config_path))
     config['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+    config['log_file'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S') / config['log_filename'])
+    config['log_dir'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
+    logger = get_logger(name='load_config', logfile=config['log_file'])
+
     if no_log == False:
         logger.info('====== show config =========')
         for key, value in config.items():

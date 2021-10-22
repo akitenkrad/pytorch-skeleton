@@ -22,8 +22,8 @@ def cli():
 @click.option('--config', type=click.Path(exists=True), help='path to config.yml')
 def find_lr(config):
     # load config
-    logger = get_logger('lr_finder.log', silent=True)
-    config = load_config(config, logger)
+    config = load_config(config)
+    logger = get_logger('lr_finder', logfile=config.log_file, silent=True)
 
     # prepare dataset
     dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TRAIN, logger)
@@ -46,8 +46,8 @@ def find_lr(config):
 @click.option('--config', type=click.Path(exists=True), help='path to config.yml')
 def train(config):
     # load config   
-    logger = get_logger('train.log', silent=True)
-    config = load_config(config, logger)
+    config = load_config(config)
+    logger = get_logger('train', logfile=config.log_file, silent=True)
 
     # prepare dataset
     dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TRAIN, logger)
@@ -69,8 +69,8 @@ def train(config):
 @click.option('--config', type=click.Path(exists=True), help='path to config.yml')
 def predict(config):
     # load config   
-    logger = get_logger('predict.log', silent=True)
-    config = load_config(config, logger)
+    config = load_config(config)
+    logger = get_logger('predict', logfile=config.log_file, silent=True)
 
     # prepare dataset
     dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TEST, logger)
@@ -87,8 +87,8 @@ def predict(config):
 @click.option('--config', type=click.Path(exists=True), help='path to config.yml')
 def validate(config):
     # load config
-    logger = get_logger('validate.log', silent=True)
-    config = load_config(config, logger)
+    config = load_config(config)
+    logger = get_logger('validate', logfile=config.log_file, silent=True)
 
     # prepare dataset
     dataset = MnistDataset(config.dataset_path, config.test_size, Phase.TEST, logger)
@@ -108,8 +108,8 @@ def validate(config):
 @click.option('--batch-size', type=int, default=64, help='batch size of incremental PCA')
 def generate_features(config, feat_dir, n_components, batch_size):
     # load config
-    logger = get_logger('generate_features.log', silent=True)
-    config = load_config(config, logger)
+    config = load_config(config)
+    logger = get_logger('generate_features', logfile=config.log_file, silent=True)
 
     # extract features and exec pca
     calculate_ipca(Path(config.dataset_path), Path(feat_dir), n_components, batch_size)

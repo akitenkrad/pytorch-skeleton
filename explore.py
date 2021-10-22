@@ -1,13 +1,19 @@
 from typing import List, Union, Tuple
+from glob import glob
+import numpy as np
 from sklearn.decomposition import IncrementalPCA
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import seaborn as sns
-
-from utils.utils import Path, glob, tqdm, np
-
 sns.set()
+
+from utils.utils import Path, is_colab
+
+if is_colab():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 class Feat(object):
     def __init__(self, data_path:Path, id:str, label:int, out:float, feat:np.ndarray):

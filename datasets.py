@@ -5,7 +5,7 @@ from torchvision.transforms import transforms
 from torch.utils.data import Dataset
 
 from utils.logger import get_logger, Logger
-from utils.utils import glob, tqdm, namedtuple, load_mnist, Phase
+from utils.utils import namedtuple, load_mnist, Phase
 
 class BaseDataset(Dataset):
     def __init__(self, dataset_path:str, test_size:float=0.2, phase:Phase=Phase.TRAIN, logger:Logger=None):

@@ -11,9 +11,14 @@ from torch.utils.data import DataLoader
 
 from utils.logger import Logger
 from utils.watchers import LossWatcher
-from utils.utils import tqdm
+from utils.utils import is_colab
 from utils.step import step
 from datasets import BaseDataset
+
+if is_colab():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -23,7 +28,7 @@ def validate(epoch, valid_dl:DataLoader, model, loss_func, threshold):
     with tqdm(valid_dl, total=len(valid_dl), desc=f'[Epoch {epoch:4d} - Validate]', leave=False) as valid_it:
         for x, y in valid_it:
             with torch.no_grad():
-                loss = step(model, device, x, y, loss_func)
+                loss, out = step(model, device, x, y, loss_func)
                 loss_watcher.put(loss.item())
 
     return loss_watcher.mean

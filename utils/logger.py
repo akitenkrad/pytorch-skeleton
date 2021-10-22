@@ -4,11 +4,12 @@ import logging
 from logging.handlers import RotatingFileHandler
 from logging import getLogger, StreamHandler, Formatter, Logger
 
-def get_json_liner(name) -> Logger:
+def get_json_liner(name:str, logfile:str='') -> Logger:
     """Generate Logger instance
 
     Args:
         name: (str) name of the logger
+        logfile: (str) logfile name
     Returns:
         Logger
     """
@@ -16,11 +17,16 @@ def get_json_liner(name) -> Logger:
     # --------------------------------
     # 0. mkdir
     # --------------------------------
-    JST = timezone(timedelta(hours=+9), 'JST')
-    now =  datetime.now(JST)
-    now = datetime(now.year, now.month, now.day, now.hour, now.minute, 0, tzinfo=JST)
-    log_dir = Path('./logs/log') / now.strftime('%Y%m%d%H%M%S') / 'json_lines'
-    log_dir.mkdir(parents=True, exist_ok=True)
+    if logfile == '':
+        JST = timezone(timedelta(hours=+9), 'JST')
+        now =  datetime.now(JST)
+        now = datetime(now.year, now.month, now.day, now.hour, now.minute, 0, tzinfo=JST)
+        log_dir = Path('./logs/log') / now.strftime('%Y%m%d%H%M%S')
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logfile = name
+    else:
+        log_dir = Path(logfile).parent
+        log_dir.mkdir(parents=True, exist_ok=True)
 
     
     # --------------------------------
@@ -62,14 +68,16 @@ def get_logger(name, logfile='', silent=False) -> Logger:
     # --------------------------------
     # 0. mkdir
     # --------------------------------
-    JST = timezone(timedelta(hours=+9), 'JST')
-    now =  datetime.now(JST)
-    now = datetime(now.year, now.month, now.day, now.hour, now.minute, 0, tzinfo=JST)
-    log_dir = Path('./logs/log') / now.strftime('%Y%m%d%H%M%S')
-    log_dir.mkdir(parents=True, exist_ok=True)
-
     if logfile == '':
+        JST = timezone(timedelta(hours=+9), 'JST')
+        now =  datetime.now(JST)
+        now = datetime(now.year, now.month, now.day, now.hour, now.minute, 0, tzinfo=JST)
+        log_dir = Path('./logs/log') / now.strftime('%Y%m%d%H%M%S')
+        log_dir.mkdir(parents=True, exist_ok=True)
         logfile = name
+    else:
+        log_dir = Path(logfile).parent
+        log_dir.mkdir(parents=True, exist_ok=True)
     
     # --------------------------------
     # 1. logger configuration

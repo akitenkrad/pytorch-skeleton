@@ -55,7 +55,7 @@ class SimpleWatcher(object):
             self.__min = x
         if self.__max < x:
             self.__max = x
-        self.__mean = (self.__mean / ((self.__count - 1) / self.__count)) + (x / self.__count)
+        self.__mean = (self.__mean / ((self.__count - 1 + 1e-10) / (self.__count + 1e-10))) + (x / (self.__count + 1e-10))
 
     @property
     def mean(self):

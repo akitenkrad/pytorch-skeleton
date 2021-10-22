@@ -8,11 +8,11 @@ lr: 0.0001
 lr_decay: 0.9
 early_stop_patience: 15
 threshold: 0.5
-dataset_path: /workplace/pytorch_skeleton/data
-weights_dir: /workplace/pytorch_skeleton/weights
-log_dir: /workplace/pytorch_skeleton/logs/log
+dataset_path: /content/pytorch_skeleton/data
+weights_dir: /content/pytorch_skeleton/weights
+log_dir: /content/pytorch_skeleton/logs/log
 log_filename: pytorch_skeleton.log
-out_dir: /workplace/pytorch_skeleton/outputs
+out_dir: /content/pytorch_skeleton/outputs
 
 model: 
     name: dla34
