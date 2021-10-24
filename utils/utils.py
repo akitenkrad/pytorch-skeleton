@@ -115,7 +115,7 @@ def backup(config:AttrDict):
     backup_dir = Path(config.backup.backup_dir)
     if backup_dir.exists():
         shutil.rmtree(str(backup_dir))
-    backup_dir.parent.mkdir(parent=True, exist_ok=True)
+    backup_dir.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(config.log_dir, config.backup.backup_dir)
 
 def load_mnist(path, kind:Phase=Phase.TRAIN):
