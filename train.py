@@ -124,7 +124,8 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
 
                         # backup files
                         if config.backup.backup:
+                            logger.info('start backup process')
                             backup(config)
-                            logger.info(f'backup logs -> {str(Path(config.backup.backup_dir).resolve().absolute())}')
+                            logger.info(f'finished backup process: backup logs -> {str(Path(config.backup.backup_dir).resolve().absolute())}')
 
                     save_model(config, model, f'{config.model.name}_last_f{fold}.pt')
