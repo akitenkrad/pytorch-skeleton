@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from utils.logger import Logger
 from utils.watchers import LossWatcher
-from utils.utils import is_colab
+from utils.utils import is_colab, backup
 from utils.step import step
 from datasets import BaseDataset
 
@@ -115,12 +115,16 @@ def train(config:AttrDict, dataset:BaseDataset, model:nn.Module, optimizer:optim
 
                         # save model regularly
                         if epoch % 5 == 0:
-                            save_model(config, model, f'{config.model.name}_last.pt')
+                            save_model(config, model, f'{config.model.name}_f{fold}e{epoch}.pt')
 
                         # early stopping
                         if valid_loss_watcher.early_stop:
                             logger.info(f'====== Early Stopping @epoch: {epoch} @Loss: {valid_loss_watcher.best_score:5.10f} ======')
-                            save_model(config, model, f'{config.model.name}_last.pt')
                             break
 
-                    save_model(config, model, f'{config.model.name}_last.pt')
+                        # backup files
+                        if config.backup.backup:
+                            backup(config)
+                            logger.info(f'backup logs -> {str(config.backup.backup_dir.resolve().absolute())}')
+
+                    save_model(config, model, f'{config.model.name}_last_f{fold}.pt')

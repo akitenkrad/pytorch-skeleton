@@ -1,18 +1,21 @@
-k_folds: 4
-epochs: 20
-batch_size: 512
-logging_per_batch: 1000
+k_folds: 3
+epochs: 5
+batch_size: 1024
+logging_per_batch: 25
 valid_size: 0.1
 test_size: 0.1
-lr: 0.0001
+lr: 0.001
 lr_decay: 0.9
-early_stop_patience: 15
+early_stop_patience: 5
 threshold: 0.5
-dataset_path: /content/pytorch_skeleton/data
-weights_dir: /content/pytorch_skeleton/weights
-log_dir: /content/pytorch_skeleton/logs/log
+dataset_path: /content/data
+log_dir: /content/log
 log_filename: pytorch_skeleton.log
-out_dir: /content/pytorch_skeleton/outputs
+out_dir: /content/outputs
+
+backup:
+    backup: True
+    backup_dir: /content/drive/MyDrive/Cloud/Outputs/DeepInTheDark
 
 model: 
     name: dla34

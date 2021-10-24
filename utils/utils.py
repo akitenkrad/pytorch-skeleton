@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from logging import Logger
 import yaml
+import shutil
 import subprocess
 import numpy as np
 import pandas as pd
@@ -74,8 +75,10 @@ def describe_gpu(nvidia_smi_path='nvidia-smi', keys=NVIDIA_SMI_DEFAULT_ATTRIBUTE
 def load_config(config_path:str, no_log:bool=False):
     config = yaml.safe_load(open(config_path))
     config['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    config['log_file'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S') / config['log_filename'])
     config['log_dir'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
+    config['log_file'] = str(Path(config['log_dir']) / config['log_filename'])
+    config['weights_dir'] = str(Path(config['log_dir']) / 'weights')
+    config['backup']['backup_dir'] = str(Path(config['backup']['backup_dir']) / config['log_dir'].name)
     logger = get_logger(name='load_config', logfile=config['log_file'])
 
     if no_log == False:
@@ -106,6 +109,13 @@ def describe_model(model:torch.nn.Module, logger:Logger):
     logger.info('----------------------------')
     logger.info('{:20s}: {}'.format('total_params', total_params))
     logger.info('============================')
+
+def backup(config:AttrDict):
+    '''copy log directory to config.backup'''
+    if config.backup.exists():
+        shutil.rmtree(str(config.backup.backup_dir))
+    config.backup.backup_dir.parent.mkdir(parent=True, exist_ok=True)
+    shutil.copytree(str(config.log_dir), str(config.backup.backup_dir))
 
 def load_mnist(path, kind:Phase=Phase.TRAIN):
     '''Load MNIST data from `path`'''
