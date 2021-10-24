@@ -112,10 +112,11 @@ def describe_model(model:torch.nn.Module, logger:Logger):
 
 def backup(config:AttrDict):
     '''copy log directory to config.backup'''
-    if config.backup.exists():
-        shutil.rmtree(str(config.backup.backup_dir))
-    config.backup.backup_dir.parent.mkdir(parent=True, exist_ok=True)
-    shutil.copytree(str(config.log_dir), str(config.backup.backup_dir))
+    backup_dir = Path(config.backup.backup_dir)
+    if backup_dir.exists():
+        shutil.rmtree(str(backup_dir))
+    backup_dir.parent.mkdir(parent=True, exist_ok=True)
+    shutil.copytree(config.log_dir, config.backup.backup_dir)
 
 def load_mnist(path, kind:Phase=Phase.TRAIN):
     '''Load MNIST data from `path`'''
