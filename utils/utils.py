@@ -78,7 +78,7 @@ def load_config(config_path:str, no_log:bool=False):
     config['log_dir'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
     config['log_file'] = str(Path(config['log_dir']) / config['log_filename'])
     config['weights_dir'] = str(Path(config['log_dir']) / 'weights')
-    config['backup']['backup_dir'] = str(Path(config['backup']['backup_dir']) / config['log_dir'].name)
+    config['backup']['backup_dir'] = str(Path(config['backup']['backup_dir']) / Path(config['log_dir']).name)
     logger = get_logger(name='load_config', logfile=config['log_file'])
 
     if no_log == False:
