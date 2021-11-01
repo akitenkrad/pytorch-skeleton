@@ -18,6 +18,7 @@ from collections import namedtuple
 from glob import glob
 from enum import Enum
 import torch
+from torchinfo import summary
 
 from utils.logger import get_logger
 
@@ -79,6 +80,8 @@ def load_config(config_path:str, no_log:bool=False):
     config['log_file'] = str(Path(config['log_dir']) / config['log_filename'])
     config['weights_dir'] = str(Path(config['log_dir']) / 'weights')
     config['backup']['backup_dir'] = str(Path(config['backup']['backup_dir']) / Path(config['log_dir']).name)
+    config['logger'] = get_logger(name=config['log_filename'], logfile=config['log_file'], silent=True)
+
     logger = get_logger(name='load_config', logfile=config['log_file'])
 
     if no_log == False:
@@ -90,7 +93,6 @@ def load_config(config_path:str, no_log:bool=False):
         logger.info('====== cpu info ============')
         for key, value in cpuinfo.get_cpu_info().items():
             logger.info(f'CPU INFO: {key:20s}: {value}')
-        logger.info('CPU INFO: {:20s}: {}'.format('cpu_count', os.cpu_count()))
         logger.info('============================')
 
         if torch.cuda.is_available():
@@ -98,17 +100,25 @@ def load_config(config_path:str, no_log:bool=False):
 
     return AttrDict(config)
 
-def describe_model(model:torch.nn.Module, logger:Logger):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    total_params = 0
-    logger.info('====== describe model ======')
-    logger.info('{:20s}: {}'.format('device', device))
-    for name, param in model.named_parameters():
-        logger.info(f'{name:20s}: {param.shape}')
-        total_params += param.numel() 
-    logger.info('----------------------------')
-    logger.info('{:20s}: {}'.format('total_params', total_params))
-    logger.info('============================')
+def describe_model(model:torch.nn.Module, input_size:tuple, input_data=None, logger:Logger=None):
+    if input_data is None:
+        summary_str = summary(model,
+            input_size=input_size,
+            col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
+            col_width=18,
+            row_settings=['var_names'],
+            verbose=2)
+    else:
+        summary_str = summary(model,
+            input_data=input_data,
+            col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
+            col_width=18,
+            row_settings=['var_names'],
+            verbose=2)
+
+    logger = logger if logger is not None else get_logger('describe_model', logfile='./log/describe_model.log', silent=True)
+    for line in summary_str.__str__().split('\n'):
+        logger.info(line)
 
 def backup(config:AttrDict):
     '''copy log directory to config.backup'''

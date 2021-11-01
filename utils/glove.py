@@ -61,7 +61,7 @@ def load_glove(weights_path:str, no_cache:bool=False):
         words = pickle.load(open(str(words_cache), 'rb'))
         word2idx = pickle.load(open(str(word2idx_cache), 'rb'))
     else:
-        logger.info('construct weights from the zip file.')
+        logger.info('construct weights from the weights file.')
         words = []
         idx = 0
         word2idx = {}
