@@ -7,7 +7,7 @@ import torch.optim as optim
 from utils.logger import get_logger
 from utils.utils import load_config, describe_model, Phase, Path
 from utils.lr_finder import lr_finder, save_figure
-from datasets import MnistDataset
+from datasets.base import MnistDataset
 from models.dla import dla34
 from train import train as train_func
 from predict import predict as pred_func

@@ -13,7 +13,7 @@ from utils.logger import Logger
 from utils.watchers import LossWatcher
 from utils.utils import is_colab, backup
 from utils.step import step
-from datasets import BaseDataset
+from datasets.base import BaseDataset
 
 if is_colab():
     from tqdm.notebook import tqdm

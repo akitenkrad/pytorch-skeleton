@@ -31,19 +31,9 @@ if is_colab():
 else:
     from tqdm import tqdm
 
-StrOrPath = Union[str, Path]
-
-NVIDIA_SMI_DEFAULT_ATTRIBUTES = (
-    'index',
-    'uuid',
-    'name',
-    'timestamp',
-    'memory.total',
-    'memory.free',
-    'memory.used',
-    'utilization.gpu',
-    'utilization.memory'
-)
+def now():
+    JST = timezone(timedelta(hours=9))
+    return datetime.now(JST)
 
 class Phase(Enum):
     DEV = 1
@@ -52,81 +42,115 @@ class Phase(Enum):
     TEST = 4
     SUBMISSION = 5
 
-def now():
-    JST = timezone(timedelta(hours=9))
-    return datetime.now(JST)
+class Config(AttrDict):
 
-def describe_gpu(nvidia_smi_path='nvidia-smi', keys=NVIDIA_SMI_DEFAULT_ATTRIBUTES, no_units=True, logger:Logger=None):
-    if logger is None:
-        logger = get_logger('gpu_info.log')
-    nu_opt = '' if not no_units else ',nounits'
-    cmd = f'{nvidia_smi_path} --query-gpu={",".join(keys)} --format=csv,noheader{nu_opt}'
-    output = subprocess.check_output(cmd, shell=True)
-    lines = output.decode().split('\n')
-    lines = [line.strip() for line in lines if line.strip() != '']
-    lines = [{ k: v for k, v in zip(keys, line.split(', '))} for line in lines ]
-    
-    logger.info('====== show GPU information =========')
-    for line in lines:
-        for k, v in line.items():
-            logger.info(f'{k:25s}: {v}')
-    logger.info('=====================================')
+    NVIDIA_SMI_DEFAULT_ATTRIBUTES = (
+        'index',
+        'uuid',
+        'name',
+        'timestamp',
+        'memory.total',
+        'memory.free',
+        'memory.used',
+        'utilization.gpu',
+        'utilization.memory'
+    )
 
+    def __init__(self, config_path:PathLike):
+        self['config_path'] = Path(config_path)
+        self.__load_config(config_path)
 
-def load_config(config_path:str, no_log:bool=False):
-    config = yaml.safe_load(open(config_path))
-    config['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    config['log_dir'] = str(Path(config['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
-    config['log_file'] = str(Path(config['log_dir']) / config['log_filename'])
-    config['weights_dir'] = str(Path(config['log_dir']) / 'weights')
-    config['backup']['backup_dir'] = str(Path(config['backup']['backup_dir']) / Path(config['log_dir']).name)
-    config['logger'] = get_logger(name=config['log_filename'], logfile=config['log_file'], silent=True)
+    @classmethod
+    def get_hash(cls, size:int=12) -> str:
+        chars = string.ascii_lowercase + string.digits
+        return ''.join(random.SystemRandom().choice(chars) for _ in range(size))
 
-    logger = get_logger(name='load_config', logfile=config['log_file'])
-
-    if no_log == False:
-        logger.info('====== show config =========')
+    def __load_config(self, config_path:str):
+        config = yaml.safe_load(open(config_path))
         for key, value in config.items():
-            logger.info(f'config: {key:20s}: {value}')
-        logger.info('============================')
+            self[key] = value
+        self['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self['log_dir'] = str(Path(self['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
+        self['log_file'] = str(Path(self['log_dir']) / self['log_filename'])
+        self['weights_dir'] = str(Path(self['log_dir']) / 'weights')
+        self['backup']['backup_dir'] = str(Path(self['backup']['backup_dir']) / Path(self['log_dir']).name)
+        self['loggers'] = AttrDict()
 
-        logger.info('====== cpu info ============')
+        if hasattr(self, '__logger') and isinstance(self.__logger, Logger):
+            kill_logger(self.__logger)
+        self['loggers']['logger']= get_logger(name='config', logfile=self['log_file'])
+        self['logger'] = self['loggers']['logger']
+        config['hash'] = Config.get_hash(16)
+
+        self.logger.info('====== show config =========')
+        attrdict_attrs = list(dir(AttrDict()))
+        for key, value in self.items():
+            if key not in attrdict_attrs:
+                self.logger.info(f'config: {key:20s}: {value}')
+        self.logger.info('============================')
+
+        self.logger.info('====== cpu info ============')
         for key, value in cpuinfo.get_cpu_info().items():
-            logger.info(f'CPU INFO: {key:20s}: {value}')
-        logger.info('============================')
+            self.logger.info(f'CPU INFO: {key:20s}: {value}')
+        self.logger.info('============================')
 
         if torch.cuda.is_available():
-            describe_gpu(logger=logger)
+            self.__describe_gpu()
 
-    return AttrDict(config)
+        return AttrDict(config)
 
-def describe_model(model:torch.nn.Module, input_size:tuple, input_data=None, logger:Logger=None):
-    if input_data is None:
-        summary_str = summary(model,
-            input_size=input_size,
-            col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
-            col_width=18,
-            row_settings=['var_names'],
-            verbose=2)
-    else:
-        summary_str = summary(model,
-            input_data=input_data,
-            col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
-            col_width=18,
-            row_settings=['var_names'],
-            verbose=2)
+    def __describe_gpu(self, nvidia_smi_path='nvidia-smi', no_units=True):
 
-    logger = logger if logger is not None else get_logger('describe_model', logfile='./log/describe_model.log', silent=True)
-    for line in summary_str.__str__().split('\n'):
-        logger.info(line)
+        try:
+            keys = self.NVIDIA_SMI_DEFAULT_ATTRIBUTES
+            nu_opt = '' if not no_units else ',nounits'
+            cmd = f'{nvidia_smi_path} --query-gpu={",".join(keys)} --format=csv,noheader{nu_opt}'
+            output = subprocess.check_output(cmd, shell=True)
+            lines = output.decode().split('\n')
+            lines = [line.strip() for line in lines if line.strip() != '']
+            lines = [{ k: v for k, v in zip(keys, line.split(', '))} for line in lines ]
 
-def backup(config:AttrDict):
-    '''copy log directory to config.backup'''
-    backup_dir = Path(config.backup.backup_dir)
-    if backup_dir.exists():
-        shutil.rmtree(str(backup_dir))
-    backup_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(config.log_dir, config.backup.backup_dir)
+            self.logger.info('====== show GPU information =========')
+            for line in lines:
+                for k, v in line.items():
+                    self.logger.info(f'{k:25s}: {v}')
+            self.logger.info('=====================================')
+        except:
+            self.logger.info('====== show GPU information =========')
+            self.logger.info('  No GPU was found.')
+            self.logger.info('=====================================')
+
+    def describe_model(self, model:torch.nn.Module, input_size:tuple=None, input_data=None):
+        if input_data is None:
+            summary_str = summary(model,
+                input_size=input_size,
+                col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
+                col_width=18,
+                row_settings=['var_names'],
+                verbose=0)
+        else:
+            summary_str = summary(model,
+                input_data=input_data,
+                col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'],
+                col_width=18,
+                row_settings=['var_names'],
+                verbose=0)
+
+        for line in summary_str.__str__().split('\n'):
+            self.logger.info(line)
+
+    def backup_logs(self):
+        '''copy log directory to config.backup'''
+        backup_dir = Path(self.backup.backup_dir)
+        if backup_dir.exists():
+            shutil.rmtree(str(backup_dir))
+        backup_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(self.log_dir, self.backup.backup_dir)
+
+    def add_logger(self, name:str):
+        self['loggers'][name]= get_logger(name=name, logfile=self['log_file'])
+        self[name] = self['loggers'][name]
+
 
 def load_mnist(path, kind:Phase=Phase.TRAIN):
     '''Load MNIST data from `path`'''
