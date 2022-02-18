@@ -1,7 +1,8 @@
-from typing import Union, List, Dict
+from typing import Union
 import os, sys
-import warnings
-warnings.filterwarnings('ignore')
+from os import PathLike
+import string
+import random
 import requests
 import cpuinfo
 import gzip
@@ -20,7 +21,7 @@ from enum import Enum
 import torch
 from torchinfo import summary
 
-from utils.logger import get_logger
+from utils.logger import get_logger, kill_logger
 
 def is_colab():
     return 'google.colab' in sys.modules
@@ -78,6 +79,7 @@ class Config(AttrDict):
 
         if hasattr(self, '__logger') and isinstance(self.__logger, Logger):
             kill_logger(self.__logger)
+
         self['loggers']['logger']= get_logger(name='config', logfile=self['log_file'])
         self['logger'] = self['loggers']['logger']
         config['hash'] = Config.get_hash(16)
@@ -89,17 +91,22 @@ class Config(AttrDict):
                 self.logger.info(f'config: {key:20s}: {value}')
         self.logger.info('============================')
 
+        # CPU info
+        self.describe_cpu()
+
+        # GPU info
+        if torch.cuda.is_available():
+            self.describe_gpu()
+
+        return AttrDict(config)
+
+    def describe_cpu(self):
         self.logger.info('====== cpu info ============')
         for key, value in cpuinfo.get_cpu_info().items():
             self.logger.info(f'CPU INFO: {key:20s}: {value}')
         self.logger.info('============================')
 
-        if torch.cuda.is_available():
-            self.__describe_gpu()
-
-        return AttrDict(config)
-
-    def __describe_gpu(self, nvidia_smi_path='nvidia-smi', no_units=True):
+    def describe_gpu(self, nvidia_smi_path='nvidia-smi', no_units=True):
 
         try:
             keys = self.NVIDIA_SMI_DEFAULT_ATTRIBUTES
@@ -150,33 +157,3 @@ class Config(AttrDict):
     def add_logger(self, name:str):
         self['loggers'][name]= get_logger(name=name, logfile=self['log_file'])
         self[name] = self['loggers'][name]
-
-
-def load_mnist(path, kind:Phase=Phase.TRAIN):
-    '''Load MNIST data from `path`'''
-
-    kind_name_map = {Phase.TRAIN: 'train', Phase.TEST: 't10k'}
-    kind_name = kind_name_map[kind]
-
-    path = Path(path)
-    path.mkdir(parents=True, exist_ok=True)
-    labels_path = path / f'{kind_name}-labels-idx1-ubyte.gz'
-    images_path = path / f'{kind_name}-images-idx3-ubyte.gz'
-
-    if not labels_path.exists() or not images_path.exists():
-        urls = [
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz',
-            'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz',
-        ]
-        for url in tqdm(urls, desc='loading mnist data...'):
-            urlData = requests.get(url).content
-            with open(path / url.split('/')[-1], 'wb') as f:
-                f.write(urlData)
-
-    with gzip.open(str(labels_path), 'rb') as lbpath:
-        labels = np.frombuffer(lbpath.read(), dtype=np.uint8, offset=8)
-    with gzip.open(str(images_path), 'rb') as imgpath:
-        images = np.frombuffer(imgpath.read(), dtype=np.uint8, offset=16).reshape(len(labels), 784)
-    return images, labels

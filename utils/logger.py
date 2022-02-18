@@ -113,3 +113,7 @@ def get_logger(name, logfile='') -> Logger:
         logger.addHandler(er_fh)
 
     return logger
+
+def kill_logger(logger:Logger):
+   name = logger.name
+   del logging.Logger.manager.loggerDict[name]
