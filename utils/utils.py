@@ -32,10 +32,6 @@ if is_colab():
 else:
     from tqdm import tqdm
 
-def now():
-    JST = timezone(timedelta(hours=9))
-    return datetime.now(JST)
-
 class Phase(Enum):
     DEV = 1
     TRAIN = 2
@@ -59,6 +55,7 @@ class Config(AttrDict):
 
     def __init__(self, config_path:PathLike):
         self['config_path'] = Path(config_path)
+        self.timestamp:datetime = self.now()
         self.__load_config(config_path)
 
     @classmethod
@@ -66,12 +63,17 @@ class Config(AttrDict):
         chars = string.ascii_lowercase + string.digits
         return ''.join(random.SystemRandom().choice(chars) for _ in range(size))
 
+    @classmethod
+    def now(cls) -> datetime:
+        JST = timezone(timedelta(hours=9))
+        return datetime.now(JST)
+
     def __load_config(self, config_path:str):
         config = yaml.safe_load(open(config_path))
         for key, value in config.items():
             self[key] = value
         self['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self['log_dir'] = str(Path(self['log_dir']) / now().strftime('%Y%m%d%H%M%S'))
+        self['log_dir'] = str(Path(self['log_dir']) / self.timestamp.strftime('%Y%m%d%H%M%S'))
         self['log_file'] = str(Path(self['log_dir']) / self['log_filename'])
         self['weights_dir'] = str(Path(self['log_dir']) / 'weights')
         self['backup']['backup_dir'] = str(Path(self['backup']['backup_dir']) / Path(self['log_dir']).name)

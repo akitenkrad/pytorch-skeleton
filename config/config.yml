@@ -8,21 +8,21 @@ lr: 0.001
 lr_decay: 0.9
 early_stop_patience: 5
 threshold: 0.5
-dataset_path: /workplace/pytorch_skeleton/data
-log_dir: /workplace/pytorch_skeleton/log
-log_filename: pytorch_skeleton.log
-out_dir: /workplace/pytorch_skeleton/outputs
+dataset_path: /workplace/pytorch-skeleton/data
+log_dir: /workplace/pytorch-skeleton/log
+log_filename: pytorch-skeleton.log
+out_dir: /workplace/pytorch-skeleton/outputs
 
 backup:
     backup: True
-    backup_dir: /content/drive/MyDrive/Cloud/Outputs/DeepInTheDark
-
-model: 
-    name: dla34
-    # hidden_dim: 300
-    # dropout: 0.3
+    backup_dir: /workplace/pytorch-skeleton/backup
 
 lr_finder:
     initial_value: 0.000000001
     final_value: 10.0
     beta: 0.98
+
+model: 
+    name: dla34
+    # hidden_dim: 300
+    # dropout: 0.3

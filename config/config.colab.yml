@@ -15,14 +15,14 @@ out_dir: /content/outputs
 
 backup:
     backup: True
-    backup_dir: /content/drive/MyDrive/Cloud/Outputs/DeepInTheDark
-
-model: 
-    name: dla34
-    # hidden_dim: 300
-    # dropout: 0.3
+    backup_dir: /content/drive/MyDrive/Cloud/Outputs/PytorchSkeleton
 
 lr_finder:
     initial_value: 0.000000001
     final_value: 10.0
     beta: 0.98
+
+model: 
+    name: dla34
+    # hidden_dim: 300
+    # dropout: 0.3
